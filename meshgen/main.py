@@ -44,7 +44,9 @@ def cmd_generate(args):
         # For earth-science use we treat 3D as points on globe surface.
         radius = 1.0
         if scheme == 'delaunay':
-            # Optionally add control grid and remove original points near control points
+            # Optionally add control grid and remove CONTROL points that are
+            # within `remove_within_deg` of any original observation. Originals
+            # are always kept.
             ctrl_cfg = cfg.get('control') or cfg.get('control_grid')
             original_count = len(lat)
             if ctrl_cfg:
@@ -52,11 +54,11 @@ def cmd_generate(args):
                 remove_deg = float(ctrl_cfg.get('remove_within_deg', 0.5))
                 ctrl_lat, ctrl_lon = generate_control_grid(spacing)
                 # compute distances between each control point and each original
-                # result shape: (n_ctrl, n_orig)
+                # result shape: (n_ctrl, n_orig). For each control point we
+                # determine whether it is farther than `remove_deg` from all
+                # originals; if not, the control point is removed.
                 dmat = great_circle_distance_deg(ctrl_lat, ctrl_lon, lat, lon)
-                min_dist_ctrl = np.min(dmat, axis=1)
-                # remove control points that are too close to any original observation
-                keep_ctrl = min_dist_ctrl > remove_deg
+                keep_ctrl = (dmat > remove_deg).all(axis=1)
                 kept_ctrl_lat = ctrl_lat[keep_ctrl]
                 kept_ctrl_lon = ctrl_lon[keep_ctrl]
                 # original points are kept; original_count is number of originals
